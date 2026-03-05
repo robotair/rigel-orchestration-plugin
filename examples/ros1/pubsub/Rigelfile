@@ -1,0 +1,69 @@
+---
+# Example 1: ROS1 Publisher/Subscriber
+# Demonstrates communication between two ROS1 nodes using topics.
+#
+# Structure:
+#   publisher/  - Publisher node (Dockerfile for docker-compose)
+#   subscriber/ - Subscriber node (Dockerfile for docker-compose)
+#   Dockerfile  - Combined image for Kubernetes deployment
+#   docker-compose.yaml - Local testing with separate containers
+#
+# Local testing:  docker compose up --build
+# K8s deploy:     poetry run rigel run sequence demo
+
+vars:
+  distro: "noetic"
+  base_image: "rigel-ros1-pubsub:1.0.0"
+
+application:
+  distro: "{{ vars.distro }}"
+
+jobs:
+  build:
+    plugin: "rigel.plugins.core.BuildXPlugin"
+    with:
+      image: "{{ vars.base_image }}"
+      load: true
+      push: false
+
+  deploy_k8s:
+    plugin: "src.plugin.OrchestrationPlugin"
+    with:
+      orchestration:
+        ros_version: ros1
+        deploy_ros_master: true
+
+        additional_k8s_params:
+          ros_master:
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: "ros-master-container"
+                      image: "ros:noetic-ros-core"
+                      command: ["/ros_entrypoint.sh"]
+                      args: ["roscore"]
+
+          application:
+            spec:
+              strategy:
+                type: Recreate
+              template:
+                spec:
+                  containers:
+                    - name: "ros-app"
+                      image: "{{ vars.base_image }}"
+                      command: ["/bin/bash", "-c"]
+                      args: ["source /opt/ros/noetic/setup.bash && (python3 /app/publisher.py & sleep 1 && python3 /app/subscriber.py & wait)"]
+                      env:
+                        - name: ROS_MASTER_URI
+                          value: "http://ros-master:11311"
+                        - name: ROS_IP
+                          valueFrom:
+                            fieldRef:
+                              fieldPath: status.podIP
+
+sequences:
+  demo:
+    stages:
+      - jobs: ["build", "deploy_k8s"]

@@ -1,0 +1,71 @@
+---
+# Example 3: ROS1 Actions (Client/Server)
+# Demonstrates communication between two ROS1 nodes using actions.
+# The action server computes Fibonacci sequences with incremental feedback.
+#
+# Structure:
+#   server/ - Action server node (Dockerfile for docker-compose, builds catkin)
+#   client/ - Action client node (Dockerfile for docker-compose, builds catkin)
+#   Dockerfile  - Combined image for Kubernetes deployment (builds catkin)
+#   docker-compose.yaml - Local testing with separate containers
+#   Fibonacci.action / package.xml / CMakeLists.txt - catkin package files
+#
+# Local testing:  docker compose up --build
+# K8s deploy:     poetry run rigel run sequence demo
+
+vars:
+  distro: "noetic"
+  base_image: "rigel-ros1-action:1.0.0"
+
+application:
+  distro: "{{ vars.distro }}"
+
+jobs:
+  build:
+    plugin: "rigel.plugins.core.BuildXPlugin"
+    with:
+      image: "{{ vars.base_image }}"
+      load: true
+      push: false
+
+  deploy_k8s:
+    plugin: "src.plugin.OrchestrationPlugin"
+    with:
+      orchestration:
+        ros_version: ros1
+        deploy_ros_master: true
+
+        additional_k8s_params:
+          ros_master:
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: "ros-master-container"
+                      image: "ros:noetic-ros-core"
+                      command: ["/ros_entrypoint.sh"]
+                      args: ["roscore"]
+
+          application:
+            spec:
+              strategy:
+                type: Recreate
+              template:
+                spec:
+                  containers:
+                    - name: "ros-app"
+                      image: "{{ vars.base_image }}"
+                      command: ["/bin/bash", "-c"]
+                      args: ["source /opt/ros/noetic/setup.bash && source /ros_workspace/devel/setup.bash && (rosrun my_package server.py & sleep 5 && rosrun my_package client.py & wait)"]
+                      env:
+                        - name: ROS_MASTER_URI
+                          value: "http://ros-master:11311"
+                        - name: ROS_IP
+                          valueFrom:
+                            fieldRef:
+                              fieldPath: status.podIP
+
+sequences:
+  demo:
+    stages:
+      - jobs: ["build", "deploy_k8s"]

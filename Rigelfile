@@ -1,8 +1,8 @@
 ---
 # Rigel Kubernetes Orchestration Plugin - Test Configuration
 vars:
-  distro: "noetic"
-  base_image: "nhopf/turtle-rigel:1.0.4"
+  distro: "humble"
+  base_image: "nhopf/turtle-rigel:2.0.0-ros2"
 
 application:
   distro: "{{ vars.distro }}"
@@ -12,9 +12,9 @@ jobs:
     plugin: "rigel.plugins.core.DockerfilePlugin"
     with:
       compiler:
-        name: "catkin_make"
+        name: "colcon"
       ros_image: "ros:{{ vars.distro }}-ros-core"
-      command: "rostopic pub /hello std_msgs/String 'Hello from K8s' -r 1"
+      command: "ros2 topic pub /hello std_msgs/String 'data: Hello from K8s' --rate 1"
       apt:
         - net-tools
 
@@ -29,7 +29,7 @@ jobs:
     plugin: "src.plugin.OrchestrationPlugin"
     with:
       orchestration:
-        deploy_ros_master: true
+        deploy_ros_master: false
         readiness:
           command: "/usr/local/bin/readiness_probe.sh"
         observability:
@@ -48,15 +48,6 @@ jobs:
               size: "1Gi"
               storage_class: "standard"
         additional_k8s_params:
-          ros_master:
-            spec:
-              template:
-                spec:
-                  containers:
-                    - name: "ros-master-container"
-                      image: "ros:{{ vars.distro }}-ros-core"
-                      command: ["/ros_entrypoint.sh"]
-                      args: ["roscore"]
           application:
             spec:
               template:
@@ -67,12 +58,13 @@ jobs:
                       command:
                         [
                           "/home/rigeluser/robot-entrypoint.sh",
-                          "rostopic",
+                          "ros2",
+                          "topic",
                           "pub",
                           "/hello",
                           "std_msgs/String",
-                          "Hello from K8s",
-                          "-r",
+                          "data: Hello from K8s",
+                          "--rate",
                           "1",
                         ]
                       readinessProbe:
@@ -85,8 +77,10 @@ jobs:
                           value: "TESTING"
                         - name: APP_VERSION
                           value: "{{ vars.base_image | regex_replace('.*:', '') }}"
-                        - name: ROS_MASTER_URI
-                          value: "http://ros-master:11311"
+                        - name: ROS_DOMAIN_ID
+                          value: "0"
+                        - name: RMW_IMPLEMENTATION
+                          value: "rmw_cyclonedds_cpp"
                       ports:
                         - containerPort: 8080
                       volumeMounts:

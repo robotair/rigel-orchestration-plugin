@@ -1,0 +1,34 @@
+# ROS2 Service (Client/Server) - local testing with docker-compose.
+# Server provides add_two_ints; client calls it every second with random numbers.
+# ROS2 uses DDS for peer-to-peer discovery - no roscore needed.
+#
+# Usage:
+#   docker compose up --build
+#   docker compose logs -f server    # watch server output
+#   docker compose logs -f client    # watch client output
+#   docker compose down
+
+services:
+  server:
+    build:
+      context: ./server
+    container_name: ros2_service_server
+    environment:
+      - ROS_DOMAIN_ID=0
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+    networks:
+      - ros-net
+
+  client:
+    build:
+      context: ./client
+    container_name: ros2_service_client
+    environment:
+      - ROS_DOMAIN_ID=0
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+    networks:
+      - ros-net
+
+networks:
+  ros-net:
+    driver: bridge

@@ -1,0 +1,58 @@
+---
+# Example 5: ROS2 Service (Client/Server)
+# Demonstrates communication between two ROS2 nodes using services.
+# ROS2 uses DDS for peer-to-peer discovery - no ROS Master needed.
+#
+# Structure:
+#   server/ - Service server node (Dockerfile for docker-compose)
+#   client/ - Service client node (Dockerfile for docker-compose)
+#   Dockerfile  - Combined image for Kubernetes deployment
+#   docker-compose.yaml - Local testing with separate containers
+#
+# Local testing:  docker compose up --build
+# K8s deploy:     poetry run rigel run sequence demo
+
+vars:
+  distro: "humble"
+  base_image: "rigel-ros2-service:1.0.0"
+
+application:
+  distro: "{{ vars.distro }}"
+
+jobs:
+  build:
+    plugin: "rigel.plugins.core.BuildXPlugin"
+    with:
+      image: "{{ vars.base_image }}"
+      load: true
+      push: false
+
+  deploy_k8s:
+    plugin: "src.plugin.OrchestrationPlugin"
+    with:
+      orchestration:
+        ros_version: ros2
+        deploy_ros_master: false
+
+        additional_k8s_params:
+          application:
+            spec:
+              strategy:
+                type: Recreate
+              template:
+                spec:
+                  containers:
+                    - name: "ros-app"
+                      image: "{{ vars.base_image }}"
+                      command: ["/bin/bash", "-c"]
+                      args: ["source /opt/ros/humble/setup.bash && (python3 /app/server.py & sleep 3 && python3 /app/client.py & wait)"]
+                      env:
+                        - name: ROS_DOMAIN_ID
+                          value: "0"
+                        - name: RMW_IMPLEMENTATION
+                          value: "rmw_fastrtps_cpp"
+
+sequences:
+  demo:
+    stages:
+      - jobs: ["build", "deploy_k8s"]

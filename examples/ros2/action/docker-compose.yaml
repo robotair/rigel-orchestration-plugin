@@ -1,0 +1,35 @@
+# ROS2 Actions (Client/Server) - local testing with docker-compose.
+# The action server computes Fibonacci sequences with incremental feedback.
+# ROS2 uses DDS for peer-to-peer discovery - no roscore needed.
+# Uses example_interfaces.action.Fibonacci (standard ROS2 action type).
+#
+# Usage:
+#   docker compose up --build
+#   docker compose logs -f server    # watch server output (feedback per step)
+#   docker compose logs -f client    # watch client output (goals and results)
+#   docker compose down
+
+services:
+  server:
+    build:
+      context: ./server
+    container_name: ros2_action_server
+    environment:
+      - ROS_DOMAIN_ID=0
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+    networks:
+      - ros-net
+
+  client:
+    build:
+      context: ./client
+    container_name: ros2_action_client
+    environment:
+      - ROS_DOMAIN_ID=0
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+    networks:
+      - ros-net
+
+networks:
+  ros-net:
+    driver: bridge

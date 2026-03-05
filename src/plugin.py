@@ -60,7 +60,13 @@ class OrchestrationPlugin(PluginBase):
         self._apps_api = AppsV1Api()
         self._core_api = CoreV1Api()
 
-        LOGGER.info("Initialized OrchestrationPlugin with validated schema.")
+        if self.orch.ros_version == "ros2" and self.orch.deploy_ros_master:
+            LOGGER.warning(
+                "ros_version is 'ros2' but deploy_ros_master is True. "
+                "ROS2 uses DDS for discovery and does not need roscore."
+            )
+
+        LOGGER.info("Initialized OrchestrationPlugin with validated schema (ROS version: %s).", self.orch.ros_version)
 
     # ----------------------------------------------------------------
     # Jobs
@@ -214,13 +220,25 @@ class OrchestrationPlugin(PluginBase):
 
         # Minimal base deployment spec
         # Default container spec - image will be overridden by additional_k8s_params
+        if self.orch.ros_version == "ros2":
+            default_image = "ros:humble-ros-base"
+            default_args = ["/bin/bash", "-c", "ros2 run my_package my_node"]
+            default_env = [
+                {"name": "ROS_DOMAIN_ID", "value": "0"},
+                {"name": "RMW_IMPLEMENTATION", "value": "rmw_fastrtps_cpp"},
+            ]
+        else:
+            default_image = "ros:noetic-ros-core"
+            default_args = ["rostopic", "pub", "/hello", "std_msgs/String", "Hello from K8s", "-r", "1"]
+            default_env = [{"name": "ROS_MASTER_URI", "value": "http://ros-master:11311"}]
+
         container_spec = {
             "name": "ros-app",
-            "image": "ros:noetic-ros-core",  # Default - will be overridden by Rigelfile
+            "image": default_image,
             "ports": [{"containerPort": 8080}],
             "command": ["/home/rigeluser/robot-entrypoint.sh"],
-            "args": ["rostopic", "pub", "/hello", "std_msgs/String", "Hello from K8s", "-r", "1"],
-            "env": [{"name": "ROS_MASTER_URI", "value": "http://ros-master:11311"}],
+            "args": default_args,
+            "env": default_env,
             "volumeMounts": [{"name": "tmp-volume", "mountPath": "/tmp"}],
         }  # Add volume mounts if available
         if volume_mounts:
@@ -436,8 +454,8 @@ class OrchestrationPlugin(PluginBase):
         """Orchestrate the main logic of your plugin."""
         LOGGER.info("[START] OrchestrationPlugin start.")
 
-        # 1) Deploy ros-master if configured
-        if self.orch.deploy_ros_master:
+        # 1) Deploy ros-master only for ROS1 (ROS2 uses DDS, no roscore needed)
+        if self.orch.ros_version == "ros1" and self.orch.deploy_ros_master:
             self.job_deploy_ros_master()
 
         # 2) Create persistent volumes if configured

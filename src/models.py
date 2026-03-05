@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -54,6 +54,7 @@ class DistributedConfig(BaseModel):
 class KubernetesOrchestrationModel(BaseModel):
     """Kubernetes Orchestration configuration for the application."""
 
+    ros_version: Literal["ros1", "ros2"] = "ros1"
     deploy_ros_master: bool = True
     readiness: ReadinessConfig | None = None
     observability: ObservabilityConfig | None = None

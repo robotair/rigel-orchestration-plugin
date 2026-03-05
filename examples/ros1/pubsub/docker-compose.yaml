@@ -1,0 +1,47 @@
+# ROS1 Publisher/Subscriber - local testing with docker-compose.
+# Each node runs in its own container; roscore provides topic discovery.
+#
+# NOTE: ROS1 logs go to ~/.ros/log/ inside containers, not stdout.
+# To view logs:
+#   docker exec ros1_publisher bash -c 'cat ~/.ros/log/number_publisher.log'
+#   docker exec ros1_subscriber bash -c 'cat ~/.ros/log/number_subscriber.log'
+#
+# Usage:
+#   docker compose up --build
+#   docker compose down
+
+services:
+  roscore:
+    image: ros:noetic-ros-core
+    container_name: ros1_pubsub_roscore
+    command: roscore
+    networks:
+      - ros-net
+
+  publisher:
+    build:
+      context: ./publisher
+    container_name: ros1_publisher
+    depends_on:
+      - roscore
+    environment:
+      - ROS_MASTER_URI=http://roscore:11311
+      - ROS_HOSTNAME=publisher
+    networks:
+      - ros-net
+
+  subscriber:
+    build:
+      context: ./subscriber
+    container_name: ros1_subscriber
+    depends_on:
+      - roscore
+    environment:
+      - ROS_MASTER_URI=http://roscore:11311
+      - ROS_HOSTNAME=subscriber
+    networks:
+      - ros-net
+
+networks:
+  ros-net:
+    driver: bridge
