@@ -8,6 +8,8 @@ application:
   distro: "{{ vars.distro }}"
 
 jobs:
+
+  # NOTE: the following job will overwrite existing Dockerfile on the root of the repository
   dockerfile:
     plugin: "rigel.plugins.core.DockerfilePlugin"
     with:
@@ -111,7 +113,7 @@ jobs:
 sequences:
   demo:
     stages:
-      - jobs: ["dockerfile", "build", "deploy_k8s"]
+      - jobs: ["build", "deploy_k8s"]
   update:
     stages:
-      - jobs: ["dockerfile", "build", "update_k8s"]
+      - jobs: ["build", "update_k8s"]

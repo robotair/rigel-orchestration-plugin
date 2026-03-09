@@ -11,6 +11,8 @@ application:
   distro: "{{ vars.distro }}"
 
 jobs:
+
+  # NOTE: the following job will overwrite existing Dockerfile on the root of the repository
   dockerfile:
     plugin: "rigel.plugins.core.DockerfilePlugin"
     with:
