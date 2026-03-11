@@ -95,7 +95,7 @@ vars:
 
 jobs:
   build:
-    plugin: "rigel.plugins.core.BuildXPlugin"
+    plugin: "rigel.plugins.core.BuildPlugin"
     with:
       image: "{{ vars.base_image }}"
       push: true # Push to registry for K8s access
