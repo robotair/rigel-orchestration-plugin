@@ -10,7 +10,7 @@
 #   docker-compose.yaml - Local testing with separate containers
 #
 # Local testing:  docker compose up --build
-# K8s deploy:     poetry run rigel run sequence demo
+# K8s deploy:     uv run rigel run sequence demo
 
 vars:
   distro: "humble"
@@ -20,6 +20,16 @@ application:
   distro: "{{ vars.distro }}"
 
 jobs:
+  dockerfile:
+    plugin: "rigel.plugins.core.ContainerfilePlugin"
+    with:
+      compiler:
+        name: "colcon"
+      ros_image: "ros:{{ vars.distro }}-ros-core"
+      command: "sleep infinity"
+      apt:
+        - net-tools
+
   build:
     plugin: "rigel.plugins.core.BuildXPlugin"
     with:
@@ -31,7 +41,6 @@ jobs:
     plugin: "src.plugin.OrchestrationPlugin"
     with:
       orchestration:
-        ros_version: ros2
         deploy_ros_master: false
 
         additional_k8s_params:
@@ -45,7 +54,10 @@ jobs:
                     - name: "ros-app"
                       image: "{{ vars.base_image }}"
                       command: ["/bin/bash", "-c"]
-                      args: ["source /opt/ros/humble/setup.bash && (python3 /app/server.py & sleep 3 && python3 /app/client.py & wait)"]
+                      args:
+                        [
+                          "source /opt/ros/humble/setup.bash && (python3 /app/server.py & sleep 3 && python3 /app/client.py & wait)",
+                        ]
                       env:
                         - name: ROS_DOMAIN_ID
                           value: "0"
@@ -56,3 +68,7 @@ sequences:
   demo:
     stages:
       - jobs: ["build", "deploy_k8s"]
+
+  generated_demo:
+    stages:
+      - jobs: ["dockerfile", "build", "deploy_k8s"]

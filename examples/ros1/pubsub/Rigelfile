@@ -9,7 +9,8 @@
 #   docker-compose.yaml - Local testing with separate containers
 #
 # Local testing:  docker compose up --build
-# K8s deploy:     poetry run rigel run sequence demo
+# Local testing via Rigel Compose plugin: uv run rigel run sequence local_test
+# K8s deploy:     uv run rigel run sequence demo
 
 vars:
   distro: "noetic"
@@ -19,6 +20,16 @@ application:
   distro: "{{ vars.distro }}"
 
 jobs:
+  dockerfile:
+    plugin: "rigel.plugins.core.ContainerfilePlugin"
+    with:
+      compiler:
+        name: "catkin_make"
+      ros_image: "ros:{{ vars.distro }}-ros-core"
+      command: "sleep infinity"
+      apt:
+        - net-tools
+
   build:
     plugin: "rigel.plugins.core.BuildXPlugin"
     with:
@@ -26,11 +37,32 @@ jobs:
       load: true
       push: false
 
+  compose_local:
+    plugin: "rigel.plugins.core.ComposePlugin"
+    with:
+      timeout: 30
+      components:
+        - name: "publisher"
+          image: "{{ vars.base_image }}"
+          command:
+            [
+              "/bin/bash",
+              "-c",
+              "source /opt/ros/noetic/setup.bash && python3 /app/publisher.py",
+            ]
+        - name: "subscriber"
+          image: "{{ vars.base_image }}"
+          command:
+            [
+              "/bin/bash",
+              "-c",
+              "source /opt/ros/noetic/setup.bash && python3 /app/subscriber.py",
+            ]
+
   deploy_k8s:
     plugin: "src.plugin.OrchestrationPlugin"
     with:
       orchestration:
-        ros_version: ros1
         deploy_ros_master: true
 
         additional_k8s_params:
@@ -54,7 +86,10 @@ jobs:
                     - name: "ros-app"
                       image: "{{ vars.base_image }}"
                       command: ["/bin/bash", "-c"]
-                      args: ["source /opt/ros/noetic/setup.bash && (python3 /app/publisher.py & sleep 1 && python3 /app/subscriber.py & wait)"]
+                      args:
+                        [
+                          "source /opt/ros/noetic/setup.bash && (python3 /app/publisher.py & sleep 1 && python3 /app/subscriber.py & wait)",
+                        ]
                       env:
                         - name: ROS_MASTER_URI
                           value: "http://ros-master:11311"
@@ -67,3 +102,11 @@ sequences:
   demo:
     stages:
       - jobs: ["build", "deploy_k8s"]
+
+  generated_demo:
+    stages:
+      - jobs: ["dockerfile", "build", "deploy_k8s"]
+
+  local_test:
+    stages:
+      - jobs: ["build", "compose_local"]
