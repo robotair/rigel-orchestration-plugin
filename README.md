@@ -21,7 +21,7 @@ Rigel plugin that orchestrates ROS applications on Kubernetes with automatic ROS
 
 ### Prerequisites
 
-- Python 3.10+ with [Poetry](https://python-poetry.org/docs/)
+- Python 3.10+ with [uv](https://docs.astral.sh/uv/)
 - A running Kubernetes cluster ([Minikube](https://minikube.sigs.k8s.io/docs/), [kind](https://kind.sigs.k8s.io/), or cloud provider)
 - `kubectl` configured to access your cluster
 - Docker for building images
@@ -33,7 +33,7 @@ Rigel plugin that orchestrates ROS applications on Kubernetes with automatic ROS
 ```bash
 git clone https://github.com/your-org/rigel-orchestration-plugin.git
 cd rigel-orchestration-plugin
-poetry install
+uv venv
 ```
 
 2. **Create your project's Rigelfile:**
@@ -49,13 +49,20 @@ cp Rigelfile.example Rigelfile
 # In your Rigelfile
 vars:
   distro: "noetic"
-  base_image: "your-registry/your-ros-app:latest"
+  base_image: "<your-registry/your-ros-app:latest>"
+```
+
+4. **Build your Docker image:**
+
+```bash
+uv run rigel run job build
+minikube image load <your-registry/your-ros-app:latest>
 ```
 
 4. **Deploy to Kubernetes:**
 
 ```bash
-poetry run rigel run sequence demo
+uv run rigel run job deploy_k8s
 ```
 
 ### Verification
@@ -88,7 +95,7 @@ vars:
 
 jobs:
   build:
-    plugin: "rigel.plugins.core.BuildXPlugin"
+    plugin: "rigel.plugins.core.BuildPlugin"
     with:
       image: "{{ vars.base_image }}"
       push: true # Push to registry for K8s access
@@ -110,6 +117,12 @@ sequences:
   deploy:
     stages:
       - jobs: ["build", "deploy_k8s"]
+```
+
+> **NOTE**: ensure that your minikube cluster has access to the images with your ROS application:
+
+```bash
+minikube image load <your-registry/your-ros-app:latest>
 ```
 
 ### Advanced Configuration Options
@@ -246,7 +259,7 @@ The plugin creates the following Kubernetes resources:
 ```bash
 # Update your image version in Rigelfile
 # Then run update sequence
-poetry run rigel run sequence update
+uv run rigel run sequence update
 ```
 
 ### Monitoring
@@ -328,13 +341,13 @@ This plugin maintains high code quality with:
 
 ```bash
 # Run full test suite
-poetry run pytest tests/ -v
+uv run pytest tests/ -v
 
 # Run with coverage report
-poetry run pytest tests/ --cov=src --cov-report=html
+uv run pytest tests/ --cov=src --cov-report=html
 
 # Run only integration tests
-poetry run pytest tests/test_integration.py -v
+uv run pytest tests/test_integration.py -v
 ```
 
 ### Contributing

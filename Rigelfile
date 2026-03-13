@@ -8,8 +8,10 @@ application:
   distro: "{{ vars.distro }}"
 
 jobs:
-  dockerfile:
-    plugin: "rigel.plugins.core.DockerfilePlugin"
+
+  # NOTE: the following job will overwrite existing Dockerfile on the root of the repository
+  containerfile:
+    plugin: "rigel.plugins.core.ContainerfilePlugin"
     with:
       compiler:
         name: "colcon"
@@ -19,7 +21,7 @@ jobs:
         - net-tools
 
   build:
-    plugin: "rigel.plugins.core.BuildXPlugin"
+    plugin: "rigel.plugins.core.BuildPlugin"
     with:
       image: "{{ vars.base_image }}"
       load: true
@@ -105,7 +107,7 @@ jobs:
 sequences:
   demo:
     stages:
-      - jobs: ["dockerfile", "build", "deploy_k8s"]
+      - jobs: ["build", "deploy_k8s"]
   update:
     stages:
-      - jobs: ["dockerfile", "build", "update_k8s"]
+      - jobs: ["build", "update_k8s"]

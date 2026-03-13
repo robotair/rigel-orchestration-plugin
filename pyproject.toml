@@ -1,26 +1,19 @@
-[tool.poetry]
-name = "src"
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rigel-orchestration-plugin"
 version = "0.1.0"
 description = "An orchestration tool that enables Rigel to manage the deployment of applications with Kubernetes."
-authors = ["Nicholas Hopf <nicholas.hopf@inesctec.pt>"]
+authors = [{ name = "Nicholas Hopf", email = "nicholas.hopf@inesctec.pt"}]
+requires-python = ">=3.10"
 readme = "README.md"
-
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.poetry.dependencies]
-python = ">=3.10,<4.0"
-pydantic = "<2.0"
-kubernetes = ">=31.0.0,<32.0.0"
-rigel = { git = "https://github.com/rigel-ros/rigel.git", rev = "develop", python = ">=3.10,<4.0" }
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.3.4"
-pytest-cov = "^6.0.0"
-ruff = "^0.8.6"
-mypy = "^1.14.1"
-pre-commit = "^4.0.1"
+dependencies = [
+    "kubernetes>=31.0.0,<32.0.0",
+    "pydantic<2.0",
+    "rigel",
+]
 
 [tool.ruff]
 line-length = 120
@@ -49,3 +42,18 @@ strict_optional = true
 [tool.pytest.ini_options]
 minversion = "8.3"
 addopts = "--cov=src --cov-report=term-missing"
+
+[tool.setuptools]
+packages = ["src"]
+
+[tool.uv.sources]
+rigel = { git = "ssh://git@github.com/robotair/rigel.git", branch = "dev" }
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "pre-commit>=4.5.1",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.15.5",
+]

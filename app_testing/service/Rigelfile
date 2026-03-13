@@ -9,7 +9,7 @@ application:
 
 jobs:
   dockerfile:
-    plugin: "rigel.plugins.core.DockerfilePlugin"
+    plugin: "rigel.plugins.core.ContainerfilePlugin"
     with:
       compiler:
         name: "catkin_make"
@@ -19,7 +19,7 @@ jobs:
         -
           net-tools
   build:
-    plugin: "rigel.plugins.core.BuildXPlugin"
+    plugin: "rigel.plugins.core.BuildPlugin"
     with:
       image: "{{ vars.base_image }}" # Rigel assumes that Dockerfile is in the same directory as the Rigelfile
       load: true # The plugin generates the image locally or pushes. Never both (either stores image locally or pushes)
