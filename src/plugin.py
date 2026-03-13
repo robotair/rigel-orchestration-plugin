@@ -8,6 +8,7 @@ from kubernetes import config
 from kubernetes.client import ApiException, AppsV1Api, CoreV1Api
 
 # Rigel imports
+import rigel
 from rigel.loggers import get_logger
 from rigel.models.builder import ModelBuilder
 
@@ -46,6 +47,7 @@ class OrchestrationPlugin(PluginBase):
 
         # For convenience, store a reference to the orchestration data
         self.orch: KubernetesOrchestrationModel = self.model.orchestration
+        self.ros_version = self._infer_ros_version_from_distro()
 
         # Set up a K8s client (in-cluster or local). For local dev, ensure your kubeconfig is present.
         # In many real cases, you'd do this in 'setup()', but we can do it here too.
@@ -60,13 +62,31 @@ class OrchestrationPlugin(PluginBase):
         self._apps_api = AppsV1Api()
         self._core_api = CoreV1Api()
 
-        if self.orch.ros_version == "ros2" and self.orch.deploy_ros_master:
+        if self.ros_version == "ros2" and self.orch.deploy_ros_master:
             LOGGER.warning(
-                "ros_version is 'ros2' but deploy_ros_master is True. "
+                "application.distro resolves to ROS2 but deploy_ros_master is True. "
                 "ROS2 uses DDS for discovery and does not need roscore."
             )
 
-        LOGGER.info("Initialized OrchestrationPlugin with validated schema (ROS version: %s).", self.orch.ros_version)
+        LOGGER.info("Initialized OrchestrationPlugin with validated schema (ROS version: %s).", self.ros_version)
+
+    def _infer_ros_version_from_distro(self) -> str:
+        """Infer ROS major version from Rigel application distro metadata."""
+        distro = self.application.distro.strip().lower()
+        ros1_distros = {d.lower() for d in rigel.ROS1_DISTROS}
+        ros2_distros = {d.lower() for d in rigel.ROS2_DISTROS}
+
+        if distro in ros1_distros:
+            return "ros1"
+        if distro in ros2_distros:
+            return "ros2"
+
+        supported = sorted(ros1_distros | ros2_distros)
+        msg = (
+            "Unsupported application.distro '%s'. Supported values are: %s"
+            % (self.application.distro, ", ".join(supported))
+        )
+        raise ValueError(msg)
 
     # ----------------------------------------------------------------
     # Jobs
@@ -220,9 +240,9 @@ class OrchestrationPlugin(PluginBase):
 
         # Minimal base deployment spec
         # Default container spec - image will be overridden by additional_k8s_params
-        if self.orch.ros_version == "ros2":
+        if self.ros_version == "ros2":
             default_image = "ros:humble-ros-base"
-            default_args = ["/bin/bash", "-c", "ros2 run my_package my_node"]
+            default_args = ["ros2", "topic", "pub", "/hello", "std_msgs/msg/String", "data: Hello from K8s", "--rate", "1"]
             default_env = [
                 {"name": "ROS_DOMAIN_ID", "value": "0"},
                 {"name": "RMW_IMPLEMENTATION", "value": "rmw_fastrtps_cpp"},
@@ -455,7 +475,7 @@ class OrchestrationPlugin(PluginBase):
         LOGGER.info("[START] OrchestrationPlugin start.")
 
         # 1) Deploy ros-master only for ROS1 (ROS2 uses DDS, no roscore needed)
-        if self.orch.ros_version == "ros1" and self.orch.deploy_ros_master:
+        if self.ros_version == "ros1" and self.orch.deploy_ros_master:
             self.job_deploy_ros_master()
 
         # 2) Create persistent volumes if configured
