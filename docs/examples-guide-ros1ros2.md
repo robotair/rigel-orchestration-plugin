@@ -21,7 +21,7 @@ This guide walks through 6 complete examples demonstrating how to use the Rigel 
 
 Before running any example, ensure you have:
 
-1. **Python 3.10+** with [Poetry](https://python-poetry.org/docs/)
+1. **Python 3.10+** with [uv](https://docs.astral.sh/uv/)
 2. **Docker** and **Docker Compose** for local testing
 3. **Kubernetes cluster** for K8s deployment ([Minikube](https://minikube.sigs.k8s.io/docs/), [kind](https://kind.sigs.k8s.io/), or cloud provider)
 4. **kubectl** configured to access your cluster
@@ -31,7 +31,7 @@ Before running any example, ensure you have:
 ```bash
 git clone https://github.com/your-org/rigel-orchestration-plugin.git
 cd rigel-orchestration-plugin
-poetry install
+uv venv
 ```
 
 ---
@@ -41,7 +41,7 @@ poetry install
 Run this first — before any example — to confirm the plugin and its dependencies are healthy:
 
 ```bash
-poetry run pytest tests/ -v
+uv run pytest tests/ -v
 ```
 
 **Expected output:**
@@ -49,10 +49,10 @@ poetry run pytest tests/ -v
 ```
 tests/test_models.py::test_...   PASSED
 ...
-10 passed, 1 skipped
+11 passed
 ```
 
-The 1 skipped test is an integration test that requires a live Minikube cluster. All 10 unit tests should pass.
+All tests should pass.
 
 ---
 
@@ -69,6 +69,17 @@ docker compose up --build
 docker compose down
 ```
 
+Optional for ROS1 examples: run local tests through Rigel's Compose plugin:
+
+```bash
+cd examples/ros1/pubsub
+uv run rigel run sequence local_test
+```
+
+This sequence runs `build -> compose_local` from the example `Rigelfile`.
+
+> **ROS2 note:** the current Rigel Compose plugin in this environment always starts `roscore`, so the `local_test` sequence is only enabled for ROS1 examples.
+
 > **ROS1 Note:** ROS1 nodes using `rospy.loginfo()` write to log files inside containers,
 > not stdout. Use `docker exec` to view logs (see each example's "Local Testing" section).
 
@@ -84,8 +95,16 @@ Use the `build` job defined in each Rigelfile:
 
 ```bash
 cd examples/ros2/pubsub
-poetry run rigel run job build
+uv run rigel run job build
 ```
+
+Optional: generate the example root `Dockerfile` with Rigel before building:
+
+```bash
+uv run rigel run sequence generated_demo
+```
+
+This sequence runs `dockerfile -> build -> deploy_k8s`.
 
 #### 3b. Load into Minikube (skip for remote clusters with a registry)
 
@@ -96,14 +115,14 @@ minikube image load rigel-ros2-pubsub:1.0.0
 #### 3c. Deploy via the plugin
 
 ```bash
-poetry run rigel run job deploy_k8s
+uv run rigel run job deploy_k8s
 ```
 
 Or run both build and deploy in one command using the `demo` sequence:
 
 ```bash
 # Note: for Minikube, run 3a and 3b first so the image is available before deploy
-poetry run rigel run sequence demo
+uv run rigel run sequence demo
 ```
 
 ---
@@ -167,6 +186,8 @@ examples/
 
 ### Rigelfile Configuration Comparison
 
+`ros_version` is inferred automatically from `application.distro`.
+
 **ROS1** — requires ROS Master:
 
 ```yaml
@@ -175,7 +196,6 @@ jobs:
     plugin: "src.plugin.OrchestrationPlugin"
     with:
       orchestration:
-        ros_version: ros1
         deploy_ros_master: true # deploys roscore as a separate K8s deployment
         additional_k8s_params:
           application:
@@ -201,7 +221,6 @@ jobs:
     plugin: "src.plugin.OrchestrationPlugin"
     with:
       orchestration:
-        ros_version: ros2
         deploy_ros_master: false # DDS handles discovery
         additional_k8s_params:
           application:
@@ -258,13 +277,13 @@ jobs:
 cd examples/ros1/pubsub
 
 # 1. Build the combined image
-poetry run rigel run job build
+uv run rigel run job build
 
 # 2. Load into Minikube
 minikube image load rigel-ros1-pubsub:1.0.0
 
 # 3. Deploy to Kubernetes
-poetry run rigel run job deploy_k8s
+uv run rigel run job deploy_k8s
 ```
 
 ### Verify on Kubernetes
@@ -326,13 +345,13 @@ kubectl delete pvc --all --ignore-not-found
 cd examples/ros1/service
 
 # 1. Build the combined image
-poetry run rigel run job build
+uv run rigel run job build
 
 # 2. Load into Minikube
 minikube image load rigel-ros1-service:1.0.0
 
 # 3. Deploy to Kubernetes
-poetry run rigel run job deploy_k8s
+uv run rigel run job deploy_k8s
 ```
 
 ### Verify on Kubernetes
@@ -432,13 +451,13 @@ kubectl delete pvc --all --ignore-not-found
 cd examples/ros1/action
 
 # 1. Build the combined image (catkin_make runs during build — takes ~30s)
-poetry run rigel run job build
+uv run rigel run job build
 
 # 2. Load into Minikube
 minikube image load rigel-ros1-action:1.0.0
 
 # 3. Deploy to Kubernetes
-poetry run rigel run job deploy_k8s
+uv run rigel run job deploy_k8s
 ```
 
 ### Verify on Kubernetes
@@ -531,13 +550,13 @@ kubectl delete pvc --all --ignore-not-found
 cd examples/ros2/pubsub
 
 # 1. Build the combined image
-poetry run rigel run job build
+uv run rigel run job build
 
 # 2. Load into Minikube
 minikube image load rigel-ros2-pubsub:1.0.0
 
 # 3. Deploy to Kubernetes
-poetry run rigel run job deploy_k8s
+uv run rigel run job deploy_k8s
 ```
 
 ### Verify on Kubernetes
@@ -628,13 +647,13 @@ kubectl delete pvc --all --ignore-not-found
 cd examples/ros2/service
 
 # 1. Build the combined image
-poetry run rigel run job build
+uv run rigel run job build
 
 # 2. Load into Minikube
 minikube image load rigel-ros2-service:1.0.0
 
 # 3. Deploy to Kubernetes
-poetry run rigel run job deploy_k8s
+uv run rigel run job deploy_k8s
 ```
 
 ### Verify on Kubernetes
@@ -733,13 +752,13 @@ kubectl delete pvc --all --ignore-not-found
 cd examples/ros2/action
 
 # 1. Build the combined image
-poetry run rigel run job build
+uv run rigel run job build
 
 # 2. Load into Minikube
 minikube image load rigel-ros2-action:1.0.0
 
 # 3. Deploy to Kubernetes
-poetry run rigel run job deploy_k8s
+uv run rigel run job deploy_k8s
 ```
 
 ### Verify on Kubernetes
