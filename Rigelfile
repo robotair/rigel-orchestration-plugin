@@ -8,17 +8,23 @@ application:
   distro: "{{ vars.distro }}"
 
 jobs:
-
   # NOTE: the following job will overwrite existing Dockerfile on the root of the repository
   containerfile:
-    plugin: "rigel.plugins.core.ContainerfilePlugin"
+    plugin: "rigel.plugins.core.DockerfilePlugin"
     with:
       compiler:
         name: "colcon"
-      ros_image: "ros:{{ vars.distro }}-ros-core"
+      ros_image: "ros:{{ vars.distro }}"
       command: "ros2 topic pub /hello std_msgs/String 'data: Hello from K8s' --rate 1"
       apt:
         - net-tools
+      ignore:
+        - examples/
+        - app_testing/
+      entrypoint:
+        - 'PROBE_PATH="$(find /home/rigeluser/ros_workspace/src -maxdepth 3 -name readiness_probe.sh | head -n 1)"'
+        - 'if [ -z "$PROBE_PATH" ]; then echo "ERROR: readiness_probe.sh not found in workspace"; exit 1; fi'
+        - 'sudo install -m 0755 "$PROBE_PATH" /usr/local/bin/readiness_probe.sh'
 
   build:
     plugin: "rigel.plugins.core.BuildPlugin"

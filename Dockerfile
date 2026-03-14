@@ -6,9 +6,9 @@
 FROM ros:humble as intermediate
 
 RUN apt clean && apt update && apt install -y \
-    git \
-    python3-rosinstall \
-    python3-vcstool \
+            git \
+            python3-rosinstall \
+            python3-vcstool \
     ssh
 
 RUN mkdir -p /root/.ssh/
@@ -22,23 +22,19 @@ RUN mkdir -p /ros_workspace/src
 
 
 
-# Clone repositories from .repos or .rosinstall.
-RUN cd /ros_workspace \ 
-    && /bin/bash -c "source /opt/ros/humble/setup.bash \
-    " && echo
-
 ############################################################################
 
-FROM ros:humble-ros-core
+FROM ros:humble
 
 # Install dependencies.
 RUN sudo apt clean && sudo apt update && sudo apt install -y \
-    build-essential \
-    python3-rosdep \
-    net-tools \
-    python3-colcon-common-extensions \
-    python3-pip \
-    python3-venv \
+            build-essential \
+            git \
+            python3-rosdep \
+            net-tools \
+            python3-colcon-common-extensions \
+            python3-pip \
+            python3-venv \
     ssh
 
 
@@ -68,9 +64,8 @@ COPY . /home/rigeluser/ros_workspace/src/rigel-orchestration-plugin
 COPY dockerfile_entrypoint.sh /home/rigeluser/robot-entrypoint.sh
 
 # Compile ROS workspace.
-RUN /bin/bash -c "source /opt/ros/humble/setup.bash \ 
+RUN /bin/bash -c "source /opt/ros/humble/setup.bash \
     && cd /home/rigeluser/ros_workspace \
-    && sudo rosdep init \
     && sudo rosdep fix-permissions \
     && rosdep update \
     && rosdep install --rosdistro humble --from-paths src --ignore-src -r -y \
