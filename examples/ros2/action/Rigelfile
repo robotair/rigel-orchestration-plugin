@@ -32,7 +32,7 @@ jobs:
         - net-tools
 
   build:
-    plugin: "rigel.plugins.core.BuildXPlugin"
+    plugin: "rigel.plugins.core.BuildPlugin"
     with:
       image: "{{ vars.base_image }}"
       load: true
