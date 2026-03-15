@@ -1,0 +1,10 @@
+# Goal - how many Fibonacci numbers to compute
+int32 order
+
+---
+# Result - the full Fibonacci sequence
+int32[] sequence
+
+---
+# Feedback - the sequence computed so far
+int32[] partial_sequence

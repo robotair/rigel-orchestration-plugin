@@ -1,0 +1,114 @@
+---
+# Example 3: ROS1 Actions (Client/Server)
+# Demonstrates communication between two ROS1 nodes using actions.
+# The action server computes Fibonacci sequences with incremental feedback.
+#
+# Structure:
+#   server/ - Action server node (Dockerfile for docker-compose, builds catkin)
+#   client/ - Action client node (Dockerfile for docker-compose, builds catkin)
+#   Dockerfile  - Combined image for Kubernetes deployment (builds catkin)
+#   docker-compose.yaml - Local testing with separate containers
+#   Fibonacci.action / package.xml / CMakeLists.txt - catkin package files
+#
+# Local testing:  docker compose up --build
+# Local testing via Rigel Compose plugin: uv run rigel run sequence local_test
+# K8s deploy:     uv run rigel run sequence demo
+
+vars:
+  distro: "noetic"
+  base_image: "rigel-ros1-action:1.0.0"
+
+application:
+  distro: "{{ vars.distro }}"
+
+jobs:
+  dockerfile:
+    plugin: "rigel.plugins.core.ContainerfilePlugin"
+    with:
+      compiler:
+        name: "catkin_make"
+      ros_image: "ros:{{ vars.distro }}-ros-core"
+      command: "sleep infinity"
+      apt:
+        - net-tools
+
+  build:
+    plugin: "rigel.plugins.core.BuildPlugin"
+    with:
+      image: "{{ vars.base_image }}"
+      load: true
+      push: false
+
+  compose_local:
+    plugin: "rigel.plugins.core.ComposePlugin"
+    with:
+      timeout: 45
+      components:
+        - name: "server"
+          image: "{{ vars.base_image }}"
+          command:
+            [
+              "/bin/bash",
+              "-c",
+              "source /opt/ros/noetic/setup.bash && source /ros_workspace/devel/setup.bash && rosrun my_package server.py",
+            ]
+        - name: "client"
+          image: "{{ vars.base_image }}"
+          command:
+            [
+              "/bin/bash",
+              "-c",
+              "source /opt/ros/noetic/setup.bash && source /ros_workspace/devel/setup.bash && sleep 5 && rosrun my_package client.py",
+            ]
+
+  deploy_k8s:
+    plugin: "src.plugin.OrchestrationPlugin"
+    with:
+      orchestration:
+        deploy_ros_master: true
+
+        additional_k8s_params:
+          ros_master:
+            spec:
+              template:
+                spec:
+                  containers:
+                    - name: "ros-master-container"
+                      image: "ros:noetic-ros-core"
+                      command: ["/ros_entrypoint.sh"]
+                      args: ["roscore"]
+
+          application:
+            spec:
+              strategy:
+                type: Recreate
+              template:
+                spec:
+                  containers:
+                    - name: "ros-app"
+                      image: "{{ vars.base_image }}"
+                      command: ["/bin/bash", "-c"]
+                      args:
+                        [
+                          "source /opt/ros/noetic/setup.bash && source /ros_workspace/devel/setup.bash && (rosrun my_package server.py & sleep 5 && rosrun my_package client.py & wait)",
+                        ]
+                      env:
+                        - name: ROS_MASTER_URI
+                          value: "http://ros-master:11311"
+                        - name: ROS_IP
+                          valueFrom:
+                            fieldRef:
+                              fieldPath: status.podIP
+
+sequences:
+  demo:
+    stages:
+      - jobs: ["build", "deploy_k8s"]
+
+  generated_demo:
+    stages:
+      - jobs: ["dockerfile", "build", "deploy_k8s"]
+
+  local_test:
+    stages:
+      - jobs: ["build", "compose_local"]

@@ -3,40 +3,41 @@
 
 # Use an intermediate stage to clone external repositories without
 # compromising the security of any private SSH key.
-FROM ros:noetic as intermediate
+FROM ros:humble as intermediate
 
 RUN apt clean && apt update && apt install -y \
-    git \
-    python3-rosinstall \
-    python3-vcstool \
+            git \
+            python3-rosinstall \
+            python3-vcstool \
     ssh
 
 RUN mkdir -p /root/.ssh/
+
+
 
 # Ensure hosts are accepted.
 RUN touch /root/.ssh/known_hosts
 
 RUN mkdir -p /ros_workspace/src
 
-# Clone repositories from .repos or .rosinstall.
-RUN cd /ros_workspace \ 
-    && /bin/bash -c "source /opt/ros/noetic/setup.bash \
-    " && echo
+
 
 ############################################################################
 
-FROM ros:noetic-ros-core
+FROM ros:humble
 
 # Install dependencies.
-RUN rm -f /etc/apt/sources.list.d/ros*.list && \
-    apt clean && apt update && apt install -y \
-    build-essential \
-    net-tools \
-    python3-pip \
-    python3-venv \
-    curl \
-    ssh \
-    && rm -rf /var/lib/apt/lists/*
+RUN sudo apt clean && sudo apt update && sudo apt install -y \
+            build-essential \
+            git \
+            python3-rosdep \
+            net-tools \
+            python3-colcon-common-extensions \
+            python3-pip \
+            python3-venv \
+    ssh
+
+
 
 # Create default user 'rigeluser'.
 ARG USERNAME=rigeluser
@@ -49,6 +50,8 @@ RUN mkdir -p /home/$USERNAME/ros_workspace/src
 # Create virtual environment for Python dependencies
 RUN python3 -m venv /home/$USERNAME/ros_workspace/.venv
 
+
+
 # Set user as ROS workspace owner
 RUN sh -c 'echo "$USERNAME ALL=(root) NOPASSWD:ALL" >> /etc/sudoers'
 RUN sh -c 'sudo chown -R rigeluser:rigeluser /home/rigeluser'
@@ -60,19 +63,18 @@ COPY . /home/rigeluser/ros_workspace/src/rigel-orchestration-plugin
 # Copy bringup script.
 COPY dockerfile_entrypoint.sh /home/rigeluser/robot-entrypoint.sh
 
-# Copy readiness probe script.
-COPY readiness_probe.sh /usr/local/bin/readiness_probe.sh
-RUN sudo chmod +x /usr/local/bin/readiness_probe.sh
-
 # Compile ROS workspace.
-RUN /bin/bash -c "source /opt/ros/noetic/setup.bash \ 
+RUN /bin/bash -c "source /opt/ros/humble/setup.bash \
     && cd /home/rigeluser/ros_workspace \
-    && catkin_make "
-    
+    && sudo rosdep fix-permissions \
+    && rosdep update \
+    && rosdep install --rosdistro humble --from-paths src --ignore-src -r -y \
+    && colcon build "
+
 # Give permissions to user
 RUN sh -c 'sudo chmod +x /home/rigeluser/robot-entrypoint.sh'
 RUN sh -c 'sudo chown rigeluser:rigeluser /home/rigeluser/robot-entrypoint.sh'
 
 # Launch ROS application.
-CMD ["rostopic", "pub", "/hello", "std_msgs/String", "Hello from K8s", "-r", "1"]
+CMD ros2 topic pub /hello std_msgs/String 'data: Hello from K8s' --rate 1
 ENTRYPOINT [ "/home/rigeluser/robot-entrypoint.sh" ]

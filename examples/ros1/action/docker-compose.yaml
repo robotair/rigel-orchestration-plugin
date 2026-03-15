@@ -1,0 +1,55 @@
+# ROS1 Actions (Client/Server) - local testing with docker-compose.
+# The action server computes Fibonacci sequences with incremental feedback.
+# Both server and client build the custom Fibonacci message type via catkin.
+#
+# NOTE: The build context is the action/ root directory so that
+# server/Dockerfile and client/Dockerfile can access Fibonacci.action,
+# package.xml, and CMakeLists.txt for catkin_make.
+#
+# NOTE: ROS1 logs go to ~/.ros/log/ inside containers, not stdout.
+# To view logs:
+#   docker exec ros1_action_server bash -c 'cat ~/.ros/log/fibonacci_server.log'
+#   docker exec ros1_action_client bash -c 'cat ~/.ros/log/fibonacci_client.log'
+#
+# Usage:
+#   docker compose up --build
+#   docker compose down
+
+services:
+  roscore:
+    image: ros:noetic-ros-core
+    container_name: ros1_action_roscore
+    command: roscore
+    networks:
+      - ros-net
+
+  server:
+    build:
+      context: .
+      dockerfile: ./server/Dockerfile
+    container_name: ros1_action_server
+    depends_on:
+      - roscore
+    environment:
+      - ROS_MASTER_URI=http://roscore:11311
+      - ROS_HOSTNAME=server
+    networks:
+      - ros-net
+
+  client:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: ros1_action_client
+    depends_on:
+      - roscore
+      - server
+    environment:
+      - ROS_MASTER_URI=http://roscore:11311
+      - ROS_HOSTNAME=client
+    networks:
+      - ros-net
+
+networks:
+  ros-net:
+    driver: bridge

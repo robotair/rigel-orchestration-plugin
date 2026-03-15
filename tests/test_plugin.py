@@ -52,6 +52,50 @@ def test_plugin_init(plugin_instance: OrchestrationPlugin) -> None:
     """Check if the plugin is initialized correctly."""
     assert plugin_instance.model.orchestration.deploy_ros_master is True
     assert plugin_instance.application.distro == "noetic"
+    assert plugin_instance.ros_version == "ros1"
+
+
+def test_ros_version_inferred_from_ros2_distro(mock_k8s_apis: tuple[MagicMock, MagicMock]) -> None:
+    """ROS version should be inferred from the Rigel application distro."""
+    raw_data = {
+        "orchestration": {
+            "deploy_ros_master": False,
+            "additional_k8s_params": {},
+        },
+    }
+
+    from rigel.models.application import Application
+
+    plugin = OrchestrationPlugin(
+        raw_data=raw_data,
+        global_data={},
+        application=Application(distro="humble"),
+        providers_data={},
+        shared_data={},
+    )
+
+    assert plugin.ros_version == "ros2"
+
+
+def test_unknown_distro_raises_error(mock_k8s_apis: tuple[MagicMock, MagicMock]) -> None:
+    """Unsupported distros should fail fast with a clear error."""
+    raw_data = {
+        "orchestration": {
+            "deploy_ros_master": False,
+            "additional_k8s_params": {},
+        },
+    }
+
+    from rigel.models.application import Application
+
+    with pytest.raises(ValueError, match="Unsupported application.distro"):
+        OrchestrationPlugin(
+            raw_data=raw_data,
+            global_data={},
+            application=Application(distro="not-a-real-distro"),
+            providers_data={},
+            shared_data={},
+        )
 
 
 def test_deploy_ros_master(plugin_instance: OrchestrationPlugin, mock_k8s_apis: tuple[MagicMock, MagicMock]) -> None:

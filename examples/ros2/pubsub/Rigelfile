@@ -1,0 +1,74 @@
+---
+# Example 4: ROS2 Publisher/Subscriber
+# Demonstrates communication between two ROS2 nodes using topics.
+# ROS2 uses DDS for peer-to-peer discovery - no ROS Master needed.
+#
+# Structure:
+#   publisher/  - Publisher node (Dockerfile for docker-compose)
+#   subscriber/ - Subscriber node (Dockerfile for docker-compose)
+#   Dockerfile  - Combined image for Kubernetes deployment
+#   docker-compose.yaml - Local testing with separate containers
+#
+# Local testing:  docker compose up --build
+# K8s deploy:     uv run rigel run sequence demo
+
+vars:
+  distro: "humble"
+  base_image: "rigel-ros2-pubsub:1.0.0"
+
+application:
+  distro: "{{ vars.distro }}"
+
+jobs:
+  dockerfile:
+    plugin: "rigel.plugins.core.ContainerfilePlugin"
+    with:
+      compiler:
+        name: "colcon"
+      ros_image: "ros:{{ vars.distro }}-ros-core"
+      command: "sleep infinity"
+      apt:
+        - net-tools
+
+  build:
+    plugin: "rigel.plugins.core.BuildPlugin"
+    with:
+      image: "{{ vars.base_image }}"
+      load: true
+      push: false
+
+  deploy_k8s:
+    plugin: "src.plugin.OrchestrationPlugin"
+    with:
+      orchestration:
+        deploy_ros_master: false
+
+        additional_k8s_params:
+          application:
+            spec:
+              strategy:
+                type: Recreate
+              template:
+                spec:
+                  containers:
+                    - name: "ros-app"
+                      image: "{{ vars.base_image }}"
+                      command: ["/bin/bash", "-c"]
+                      args:
+                        [
+                          "source /opt/ros/humble/setup.bash && (python3 /app/publisher.py & sleep 1 && python3 /app/subscriber.py & wait)",
+                        ]
+                      env:
+                        - name: ROS_DOMAIN_ID
+                          value: "0"
+                        - name: RMW_IMPLEMENTATION
+                          value: "rmw_fastrtps_cpp"
+
+sequences:
+  demo:
+    stages:
+      - jobs: ["build", "deploy_k8s"]
+
+  generated_demo:
+    stages:
+      - jobs: ["dockerfile", "build", "deploy_k8s"]

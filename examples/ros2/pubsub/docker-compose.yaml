@@ -1,0 +1,34 @@
+# ROS2 Publisher/Subscriber - local testing with docker-compose.
+# ROS2 uses DDS for peer-to-peer discovery - no roscore needed.
+# Both nodes share a network and communicate via DDS with ROS_DOMAIN_ID=0.
+#
+# Usage:
+#   docker compose up --build
+#   docker compose logs -f publisher    # watch publisher output
+#   docker compose logs -f subscriber   # watch subscriber output
+#   docker compose down
+
+services:
+  publisher:
+    build:
+      context: ./publisher
+    container_name: ros2_publisher
+    environment:
+      - ROS_DOMAIN_ID=0
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+    networks:
+      - ros-net
+
+  subscriber:
+    build:
+      context: ./subscriber
+    container_name: ros2_subscriber
+    environment:
+      - ROS_DOMAIN_ID=0
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+    networks:
+      - ros-net
+
+networks:
+  ros-net:
+    driver: bridge
